@@ -1,0 +1,19 @@
+{
+  "n_providers_total": 5410,
+  "n_train": 4057,
+  "n_test": 1353,
+  "fraud_rate_overall": 0.09353049907578559,
+  "baseline_roc_auc": 0.9509640210145021,
+  "baseline_pr_auc": 0.726033093941782,
+  "primary_roc_auc": 0.9550969159034566,
+  "primary_pr_auc": 0.7330839272412005,
+  "rf_roc_auc": 0.9484849263336373,
+  "rf_pr_auc": 0.6763743103048949,
+  "target_recall": 0.7,
+  "baseline_fpr_at_target_recall": 0.06035889070146819,
+  "baseline_actual_recall": 0.7086614173228346,
+  "primary_fpr_at_target_recall": 0.044861337683523655,
+  "primary_actual_recall": 0.7007874015748031,
+  "relative_fpr_reduction_pct": 25.67567567567567,
+  "pct_point_fpr_reduction": 1.5497553017944532
+}
