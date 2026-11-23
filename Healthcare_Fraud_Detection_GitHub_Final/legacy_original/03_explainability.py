@@ -1,140 +1,318 @@
+
 """
-Provider-Level Healthcare Claims Fraud Detection
-Step 3: Explainability
+Healthcare Provider Fraud-Risk Detection
+Step 3: Model Evaluation and Explainability
 
-Uses permutation importance (a model-agnostic, statistically grounded explainability
-method built into scikit-learn) to identify which features drive the primary model's
-fraud predictions, and produces per-provider explanations for a handful of flagged
-cases -- the "interpretable investigative risk scoring" output an investigator would
-actually use.
+This script:
+1. Loads a previously trained provider-level classification model.
+2. Evaluates global feature importance using permutation importance.
+3. Generates ROC and precision-recall curves.
+4. Saves evaluation metrics, feature importance, and visualizations.
 
-NOTE ON SHAP: the sandboxed environment used to build this pipeline has no internet
-access, so the `shap` package could not be installed here. Permutation importance is
-a legitimate, peer-reviewed, model-agnostic alternative that ships with scikit-learn
-and requires no extra dependency. A ready-to-run SHAP cell is included at the bottom
-of this file, commented out, for use in a normal environment (e.g. Google Colab or a
-local machine with internet access) -- run that separately and do not cite SHAP output
-values that have not actually been generated.
+The analysis evaluates predictions of the historical PotentialFraud label.
+Permutation importance measures global model reliance on features;
+it does not establish causal effects or individual prediction explanations.
 """
 
-import pandas as pd
-import numpy as np
+import json
 import pickle
+from pathlib import Path
+
 import matplotlib
 matplotlib.use("Agg")
+
 import matplotlib.pyplot as plt
+import pandas as pd
+
 from sklearn.inspection import permutation_importance
-from sklearn.metrics import roc_curve, precision_recall_curve
+from sklearn.metrics import (
+    average_precision_score,
+    precision_recall_curve,
+    roc_auc_score,
+    roc_curve,
+)
 
-with open("/home/claude/fraud_analysis/primary_model.pkl", "rb") as f:
-    model = pickle.load(f)
 
-X_train = pd.read_csv("/home/claude/fraud_analysis/X_train.csv")
-test_df = pd.read_csv("/home/claude/fraud_analysis/test_predictions.csv")
+# ------------------------------------------------------------
+# 1. Project paths
+# ------------------------------------------------------------
 
-feature_cols = [c for c in X_train.columns]
-X_test = test_df[feature_cols]
+SCRIPT_DIR = Path(__file__).resolve().parent
+
+# Supports scripts stored in the repository root or in src/.
+PROJECT_DIR = (
+    SCRIPT_DIR.parent
+    if SCRIPT_DIR.name.lower() in {"src", "scripts"}
+    else SCRIPT_DIR
+)
+
+OUTPUT_DIR = PROJECT_DIR / "outputs"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def find_input(filename):
+    """
+    Locate a required input in common project directories.
+    """
+    search_dirs = [
+        PROJECT_DIR,
+        PROJECT_DIR / "data",
+        PROJECT_DIR / "models",
+        PROJECT_DIR / "outputs",
+        PROJECT_DIR / "artifacts",
+        PROJECT_DIR / "legacy_original",
+    ]
+
+    for directory in search_dirs:
+        path = directory / filename
+        if path.is_file():
+            return path
+
+    searched = "\n".join(str(p / filename) for p in search_dirs)
+    raise FileNotFoundError(
+        f"Required file '{filename}' was not found.\n"
+        f"Checked:\n{searched}\n\n"
+        "Run the training pipeline first or restore the required artifact."
+    )
+
+
+# ------------------------------------------------------------
+# 2. Load model and data
+# ------------------------------------------------------------
+
+model_path = find_input("primary_model.pkl")
+train_path = find_input("X_train.csv")
+test_path = find_input("test_predictions.csv")
+
+with model_path.open("rb") as file:
+    model = pickle.load(file)
+
+X_train = pd.read_csv(train_path)
+test_df = pd.read_csv(test_path)
+
+feature_cols = X_train.columns.tolist()
+
+required_cols = feature_cols + ["Label"]
+missing_cols = [c for c in required_cols if c not in test_df.columns]
+
+if missing_cols:
+    raise ValueError(
+        f"Missing columns in test_predictions.csv: {missing_cols}"
+    )
+
+if X_train.empty or test_df.empty:
+    raise ValueError("Training features and test data must not be empty.")
+
+X_test = test_df.loc[:, feature_cols].copy()
 y_test = test_df["Label"]
 
-# ---------------------------------------------------------------------------
-# 1. Global feature importance via permutation importance
-#    (measures the drop in model performance when each feature is randomly
-#    shuffled -- a feature that matters a lot will hurt performance a lot
-#    when scrambled; this is model-agnostic and not biased toward
-#    high-cardinality features the way raw impurity-based importance can be)
-# ---------------------------------------------------------------------------
+if y_test.isna().any():
+    raise ValueError("Test labels contain missing values.")
+
+if not set(y_test.unique()).issubset({0, 1}):
+    raise ValueError("Test labels must be binary values 0 and 1.")
+
+if y_test.nunique() != 2:
+    raise ValueError("ROC-AUC requires both label classes in the test set.")
+
+if X_test.isna().any().any():
+    raise ValueError(
+        "Test features contain missing values. "
+        "Use the same preprocessing pipeline as model training."
+    )
+
+if not hasattr(model, "predict_proba"):
+    raise TypeError(
+        "The loaded model must support predict_proba()."
+    )
+
+if not hasattr(model, "classes_"):
+    raise TypeError(
+        "The loaded model does not expose class labels."
+    )
+
+classes = list(model.classes_)
+
+if 1 not in classes:
+    raise ValueError(
+        "The trained model must include positive class 1."
+    )
+
+positive_index = classes.index(1)
+
+print("Model and datasets loaded successfully.")
+print(f"Training providers: {len(X_train):,}")
+print(f"Test providers: {len(X_test):,}")
+print(f"Features: {len(feature_cols)}")
+
+
+# ------------------------------------------------------------
+# 3. Calculate test-set predictions and metrics
+# ------------------------------------------------------------
+
+y_score = model.predict_proba(X_test)[:, positive_index]
+
+roc_auc = roc_auc_score(y_test, y_score)
+average_precision = average_precision_score(y_test, y_score)
+test_prevalence = float(y_test.mean())
+
+metrics = {
+    "test_providers": int(len(X_test)),
+    "feature_count": len(feature_cols),
+    "roc_auc": float(roc_auc),
+    "average_precision": float(average_precision),
+    "test_positive_label_rate": test_prevalence,
+}
+
+with (OUTPUT_DIR / "explainability_metrics.json").open(
+    "w", encoding="utf-8"
+) as file:
+    json.dump(metrics, file, indent=2)
+
+print(f"\nTest ROC-AUC: {roc_auc:.4f}")
+print(f"Test Average Precision: {average_precision:.4f}")
+
+
+# ------------------------------------------------------------
+# 4. Global permutation importance
+# ------------------------------------------------------------
+
+print("\nCalculating permutation importance...")
+
 perm_result = permutation_importance(
-    model, X_test, y_test, n_repeats=20, random_state=42, scoring="roc_auc"
+    estimator=model,
+    X=X_test,
+    y=y_test,
+    scoring="roc_auc",
+    n_repeats=20,
+    random_state=42,
+    n_jobs=1,
 )
 
 importance_df = pd.DataFrame({
     "feature": feature_cols,
     "importance_mean": perm_result.importances_mean,
     "importance_std": perm_result.importances_std,
-}).sort_values("importance_mean", ascending=False)
+}).sort_values(
+    by="importance_mean",
+    ascending=False,
+)
 
-print("Top 10 features by permutation importance (impact on ROC-AUC):")
+importance_df.to_csv(
+    OUTPUT_DIR / "feature_importance.csv",
+    index=False,
+)
+
+print("\nTop 10 features by permutation importance:")
 print(importance_df.head(10).to_string(index=False))
 
-importance_df.to_csv("/home/claude/fraud_analysis/feature_importance.csv", index=False)
 
-# Plot feature importance
-fig, ax = plt.subplots(figsize=(9, 6))
-top_n = importance_df.head(12).iloc[::-1]
-ax.barh(top_n["feature"], top_n["importance_mean"], xerr=top_n["importance_std"], color="#2E5C8A")
-ax.set_xlabel("Permutation Importance (mean decrease in ROC-AUC when shuffled)")
-ax.set_title("Feature Importance — Provider-Level Healthcare Claims Fraud Model")
-plt.tight_layout()
-plt.savefig("/home/claude/fraud_analysis/feature_importance.png", dpi=150)
-print("\nSaved feature_importance.png")
+# ------------------------------------------------------------
+# 5. Feature importance visualization
+# ------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# 2. ROC and Precision-Recall curves (baseline vs primary), for the repo README
-# ---------------------------------------------------------------------------
-import json
-with open("/home/claude/fraud_analysis/results_summary.json") as f:
-    summary = json.load(f)
+top_features = importance_df.head(12).iloc[::-1]
 
-fpr, tpr, _ = roc_curve(y_test, model.predict_proba(X_test)[:, 1])
-prec, rec, _ = precision_recall_curve(y_test, model.predict_proba(X_test)[:, 1])
+fig, ax = plt.subplots(figsize=(10, 6))
 
-fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-axes[0].plot(fpr, tpr, color="#2E5C8A", label=f"Primary model (ROC-AUC={summary['primary_roc_auc']:.3f})")
-axes[0].plot([0, 1], [0, 1], "--", color="gray", label="Random")
+ax.barh(
+    top_features["feature"],
+    top_features["importance_mean"],
+    xerr=top_features["importance_std"],
+    color="#2E5C8A",
+    capsize=3,
+)
+
+ax.axvline(0, color="gray", linewidth=0.8)
+
+ax.set_xlabel("Mean decrease in ROC-AUC after permutation")
+ax.set_title("Global Feature Importance — Provider-Level Model")
+
+fig.tight_layout()
+
+fig.savefig(
+    OUTPUT_DIR / "feature_importance.png",
+    dpi=150,
+    bbox_inches="tight",
+)
+
+plt.close(fig)
+
+
+# ------------------------------------------------------------
+# 6. ROC and precision-recall curves
+# ------------------------------------------------------------
+
+fpr, tpr, _ = roc_curve(y_test, y_score)
+precision, recall, _ = precision_recall_curve(y_test, y_score)
+
+fig, axes = plt.subplots(1, 2, figsize=(13, 5))
+
+# ROC curve
+axes[0].plot(
+    fpr,
+    tpr,
+    color="#2E5C8A",
+    linewidth=2,
+    label=f"Model (ROC-AUC = {roc_auc:.3f})",
+)
+
+axes[0].plot(
+    [0, 1],
+    [0, 1],
+    linestyle="--",
+    color="gray",
+    label="Random classifier",
+)
+
 axes[0].set_xlabel("False Positive Rate")
-axes[0].set_ylabel("True Positive Rate (Recall)")
-axes[0].set_title("ROC Curve — Test Set")
+axes[0].set_ylabel("True Positive Rate")
+axes[0].set_title("ROC Curve — Held-Out Test Set")
 axes[0].legend()
 
-axes[1].plot(rec, prec, color="#2E5C8A", label=f"Primary model (PR-AUC={summary['primary_pr_auc']:.3f})")
-axes[1].axhline(y=summary["fraud_rate_overall"], linestyle="--", color="gray", label="No-skill baseline")
+# Precision-recall curve
+axes[1].plot(
+    recall,
+    precision,
+    color="#2E5C8A",
+    linewidth=2,
+    label=f"Model (AP = {average_precision:.3f})",
+)
+
+axes[1].axhline(
+    y=test_prevalence,
+    linestyle="--",
+    color="gray",
+    label="No-skill baseline",
+)
+
 axes[1].set_xlabel("Recall")
 axes[1].set_ylabel("Precision")
-axes[1].set_title("Precision-Recall Curve — Test Set")
+axes[1].set_title("Precision-Recall Curve — Held-Out Test Set")
 axes[1].legend()
 
-plt.tight_layout()
-plt.savefig("/home/claude/fraud_analysis/roc_pr_curves.png", dpi=150)
-print("Saved roc_pr_curves.png")
+fig.tight_layout()
 
-# ---------------------------------------------------------------------------
-# 3. Per-provider explanation example: for a provider flagged as high-risk,
-#    show which features pushed the score up (a simplified, interpretable
-#    "reason code" style explanation an investigator could act on)
-# ---------------------------------------------------------------------------
-test_df_sorted = test_df.sort_values("PrimaryModelProba", ascending=False)
-example = test_df_sorted.iloc[0]
-
-train_means = X_train.mean()
-print("\n" + "=" * 70)
-print("EXAMPLE: highest-risk-scored provider in the test set")
-print("=" * 70)
-print(f"Model-assigned fraud probability: {example['PrimaryModelProba']:.3f}")
-print(f"Actual label: {'Fraud' if example['Label'] == 1 else 'No Fraud'}")
-print("\nFeatures most above the training-set average (top contributors to risk score):")
-deviations = (example[feature_cols] - train_means) / train_means.replace(0, 1)
-top_deviations = deviations.sort_values(ascending=False).head(5)
-for feat, dev in top_deviations.items():
-    print(f"  {feat}: {example[feat]:.2f} (population avg: {train_means[feat]:.2f}, {dev*100:+.0f}%)")
-
-print("\nDone. All outputs saved to /home/claude/fraud_analysis/")
-
-# ---------------------------------------------------------------------------
-# OPTIONAL — run this separately in an environment with internet access to
-# generate true SHAP values. Not run here; included for completeness only.
-# ---------------------------------------------------------------------------
-"""
-import shap
-explainer = shap.TreeExplainer(model)
-shap_values = explainer.shap_values(X_test)
-
-shap.summary_plot(shap_values, X_test, show=False)
-plt.savefig("shap_summary.png", dpi=150, bbox_inches="tight")
-
-# Per-provider explanation (e.g. the highest-risk provider)
-shap.force_plot(
-    explainer.expected_value, shap_values[0], X_test.iloc[0],
-    matplotlib=True, show=False
+fig.savefig(
+    OUTPUT_DIR / "roc_pr_curves.png",
+    dpi=150,
+    bbox_inches="tight",
 )
-plt.savefig("shap_force_plot_example.png", dpi=150, bbox_inches="tight")
-"""
+
+plt.close(fig)
+
+
+# ------------------------------------------------------------
+# 7. Completion summary
+# ------------------------------------------------------------
+
+print("\nAnalysis completed successfully.")
+print(f"Outputs saved in: {OUTPUT_DIR}")
+
+for filename in [
+    "explainability_metrics.json",
+    "feature_importance.csv",
+    "feature_importance.png",
+    "roc_pr_curves.png",
+]:
+    print(f"  - {filename}")
