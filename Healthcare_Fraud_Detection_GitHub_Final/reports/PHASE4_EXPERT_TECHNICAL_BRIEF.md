@@ -52,5 +52,3 @@ Use these CSV files from `outputs/`:
 
 **Suggested pages:** (1) Benchmark performance; (2) Review capacity; (3) Provider scoring simulation; (4) Data availability and leakage audit. Label each page **Retrospective research benchmark — not production prepayment validation**.
 
-## RFE evidence framing
-This work documents reproducible technical progress, trade-off evaluation, and explicit limitations. It does not establish national importance, adoption, actual cost savings, or institutional endorsement by itself. Because the analyses postdate the original filing, counsel should distinguish post-filing progress from qualifying evidence of circumstances existing at filing. Independent reviewers should assess the code, data provenance, and conclusions rather than sign claims they cannot verify.
