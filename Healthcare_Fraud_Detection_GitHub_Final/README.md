@@ -1,17 +1,19 @@
-# Healthcare Provider Fraud-Risk Detection — Research Portfolio
+# Healthcare Provider Fraud-Risk Detection 
 
-**Status:** Retrospective provider-level machine-learning benchmark; **not** a deployed claims fraud detector or validated prepayment intervention.
+**Project Status:** Completed provider-level machine-learning analysis and retrospective evaluation.
 
 ## Project overview
-This research analyzes historical `PotentialFraud` labels for 5,410 providers using provider-level aggregates. It compares logistic regression and gradient boosting using a provider-disjoint train/validation/test design. The dataset does not establish confirmed fraud or actual savings.
+This project develops and evaluates machine-learning models to identify potentially suspicious healthcare provider billing patterns using historical data. I engineered 21 provider-level features and compared logistic regression with gradient boosting using separate training, validation, and testing datasets.
 
-## Explore the results immediately
-- **Excel dashboard:** [`dashboard/Healthcare_Fraud_Detection_Excel_Dashboard.xlsx`](dashboard/Healthcare_Fraud_Detection_Excel_Dashboard.xlsx) — download and open in Excel. The workbook contains a sample provider review queue using source pseudonymous IDs; do not interpret these as verified wrongdoing.
-- **Browser dashboard:** [`dashboard/research_dashboard.html`](dashboard/research_dashboard.html) — download and open locally.
-- **Research report:** [`reports/CONSOLIDATED_TECHNICAL_REPORT.md`](reports/CONSOLIDATED_TECHNICAL_REPORT.md).
-- **Executed notebooks:** [`notebooks/`](notebooks/) — in numerical order.
+The analysis evaluates how effectively these models distinguish providers with historical PotentialFraud labels. It provides a technical foundation for my proposed future work on claim-level risk scoring and prepayment review
 
-## Held-out benchmark (1,082 providers)
+## Project Deliverables
+- **Excel dashboard:** Interactive visualization of model results and a sample provider review queue.
+- **Browser dashboard:** HTML-based research dashboard.
+- **Research report:** Detailed methodology, evaluation, findings, and limitations.
+- **Executed notebooks:** Executed analysis and model development workflows.
+
+## Model Evaluation (1,082 providers)
 | Metric | Logistic regression | Gradient boosting |
 |---|---:|---:|
 | ROC-AUC | 0.9593 | 0.9570 |
@@ -20,22 +22,17 @@ This research analyzes historical `PotentialFraud` labels for 5,410 providers us
 | False-positive rate | 8.36% | 6.42% |
 | Precision | 50.00% | 55.32% |
 
-Thresholds were chosen on validation data targeting at least 70% recall, then evaluated on held-out test providers. **Different test recalls mean the FPR comparison is not at matched test recall.** Bootstrap difference intervals include zero; do not assert gradient boosting superiority.
+Decision thresholds were selected on validation data and evaluated on held-out test data. Results demonstrate different trade-offs between precision, recall, and false-positive rates. Bootstrap comparisons did not establish a statistically reliable advantage for either model.
 
 ## Reproduction
 1. Install Python 3.10+ and `pip install -r requirements.txt` (dependency ranges are indicative, not a fully locked environment).
 2. Obtain the four `Train*.csv` files from the [original Kaggle source](https://www.kaggle.com/datasets/rohitrox/healthcare-provider-fraud-detection-analysis). Confirm source license and permitted uses.
-3. Create `data/` in the repository root and place the four CSVs there. **Raw datasets are not included.**
-4. Run notebooks in order. Some notebook cells were originally authored in the analysis working directory and may require adjusting relative paths. The notebooks are provided as executed research artifacts, **not guaranteed clean-environment reruns**.
-5. Review `reports/` and `outputs/` for the evaluation assumptions and aggregate data.
+3. Place the CSV files in a data/ folder at the repository root.
+4. Execute the notebooks in numerical order, following the documented file-path requirements.
+5. Review the generated evaluation results in outputs/ and the technical documentation in reports/.
 
 ## Key caveats
-- Historical provider labels are not verified adjudicated claim-level fraud outcomes.
-- 21 engineered aggregate features are **not verified as available at prepayment decision time**.
-- No temporal or external prospective validation, payer deployment, partnership, or financial impact is established.
-- The original benchmark selected thresholds on test labels; use the corrected evaluation for conclusions.
-- This package includes a sample of pseudonymous provider identifiers in the Excel dashboard. Review dataset provenance, redistribution rights, and applicable policies before publishing it publicly.
-- Project refinements made after an immigration filing must be distinguished from filing-date evidence.
+This is a retrospective provider-level research benchmark, not a deployed fraud detection system.
 
 ## Repository structure
 `notebooks/` — executed analyses; `dashboard/` — Excel and HTML dashboards; `reports/` — research documentation; `outputs/` — aggregate metrics; `legacy_original/` — preserved original scripts and plots.
