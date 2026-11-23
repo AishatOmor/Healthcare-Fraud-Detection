@@ -63,6 +63,3 @@ A possible workflow would be: receive claim → retrieve strictly prior provider
 - Phase 4 datasets: model metrics, paired bootstrap intervals, top-K capacity, review queue, feature audit, and claim-volume slices.
 - Phase 5: `research_dashboard.html` (interactive **standalone HTML**, not a Power BI `.pbix` file), `temporal_feasibility.csv`, and Power BI build instructions.
 - Independent reviewers should rerun the notebooks, check dependency versions, verify the source-data license/provenance, and examine the split and features before endorsing conclusions.
-
-## 12. Relevance and limits for EB-2 NIW evidence
-This portfolio work documents technical capability, reproducibility efforts, and an explainable approach to healthcare payment-integrity research. It **does not alone prove** national importance under USCIS standards, measurable US healthcare savings, clinical/payer adoption, or that waiving the labor certification requirement is beneficial. Because these refinements were prepared after filing, legal counsel should distinguish later technical progress from facts existing at filing. Any independent expert letter should state exactly what the reviewer inspected and independently concluded.
