@@ -1,0 +1,13 @@
+feature,status,reason
+prior_n,Conditional proxy,Strictly earlier service dates; receipt timestamps unavailable
+prior_ip,Conditional proxy,Strictly earlier service dates; receipt timestamps unavailable
+prior_days,Conditional proxy,Strictly earlier service dates; receipt timestamps unavailable
+prior_ip_share,Conditional proxy,Strictly earlier service dates; receipt timestamps unavailable
+ip,Conditional proxy,Claim type may be known at submission but source timing unverified
+dx_count,Conditional proxy,Diagnosis codes may be revised after submission
+px_count,Conditional proxy,Procedure codes may be revised after submission
+InscClaimAmtReimbursed,Excluded,Actual reimbursement may be post-adjudication
+DeductibleAmtPaid,Excluded,Actual paid amount may be post-adjudication
+ClaimEndDt,Excluded,May be later than service-date proxy
+DischargeDt,Excluded,May be later than service-date proxy
+PotentialFraud,Target only,Static retrospective provider label not a claim outcome

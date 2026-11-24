@@ -1,0 +1,2 @@
+claims,days,queued,provider_day_groups,groups_with_distinct_scores,dx_threshold_outpatient,dx_threshold_inpatient,px_threshold_outpatient,px_threshold_inpatient
+18672,61,610,10770,491,7.0,10.0,0.0,2.0

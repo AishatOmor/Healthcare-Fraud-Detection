@@ -1,0 +1,9 @@
+Model,ReviewCapacity,LabeledPositiveInTopK,PrecisionAtK,FractionOfTestPositivesCaptured
+Gradient boosting,25,20,0.8,0.19801980198019803
+Gradient boosting,50,42,0.84,0.4158415841584158
+Gradient boosting,100,63,0.63,0.6237623762376238
+Gradient boosting,200,87,0.435,0.8613861386138614
+Logistic regression,25,24,0.96,0.2376237623762376
+Logistic regression,50,43,0.86,0.42574257425742573
+Logistic regression,100,66,0.66,0.6534653465346535
+Logistic regression,200,89,0.445,0.8811881188118812
